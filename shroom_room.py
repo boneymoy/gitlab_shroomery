@@ -1,6 +1,7 @@
-import datetime
+from datetime import datetime
 import subprocess
 from csv import writer
+import random
 
 
 class ShroomRoom():
@@ -30,17 +31,18 @@ class ShroomRoom():
         """
         current_time = datetime.now()
         current_time_str = current_time.strftime("%d/%m/%Y %H:%M:%S")
-        self.current_state = [5, 3, 3, 3, 4, 5, 6, current_time_str]
+        rand = random.randint(0, 10)
+        self._current_state = [rand, 5, 6, current_time_str]
         self.append_measurement()
 
     def upload_to_nextcloud(self):
         subprocess.call(["./upload.sh", self.file_path])
+        print('uploaded')
 
     def append_measurement(self):
         # Open file in append mode
-        with open(self.file_name, 'a+', newline='') as write_obj:
+        with open(self.file_path, 'a+', newline='') as write_obj:
             # Create a writer object from csv module
             csv_writer = writer(write_obj)
             # Add contents of list as last row in the csv file
             csv_writer.writerow(self._current_state)
-        self.upload_to_nextcloud()
