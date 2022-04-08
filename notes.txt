@@ -1,0 +1,5 @@
+MH_Z19:
+    Seriellen Pin freigeben mit raspi-config
+DHT22:
+    sudo pigpiod - immer bei restart ausführen
+    pigpio.pi installieren

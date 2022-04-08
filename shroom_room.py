@@ -1,38 +1,75 @@
+from enum import Enum, IntEnum
 from datetime import datetime
-import subprocess
 from csv import writer
-import random
+import subprocess
 
+import RPi.GPIO as GPIO
+import Adafruit_DHT
+import mh_z19
+import pigpio
+import DHT22
+
+class Pins(IntEnum):
+    RELAIS_1 = 4
+    LED_1 = 26
+    SENSOR = 27
+
+class Sensor(Enum):
+    HUMIDITY = 'humidity'
+    TEMPERATURE = 'temperature'
+    CO2 = 'co2'
 
 class ShroomRoom():
 
     def __init__(self,
                  file_path: str,
-                 max_c02: int,
-                 min_c02: int,
+                 max_co2: int,
+                 min_co2: int,
                  max_temp: int,
                  min_temp: int,
                  max_hum: int,
-                 min_hum: int):
+                 min_hum: int,
+                 hum_sensor_pin: int,
+                 co2_pin: int,
+                 light_pin: int,
+                 fan_pin: int):
         """
         """
         self.file_path = file_path
-        self.max_c02 = max_c02
-        self.min_c02 = min_c02
+        self.max_co2 = max_co2
+        self.min_co2 = min_co2
         self.max_temp = max_temp
         self.min_temp = min_temp
         self.max_hum = max_hum
         self.min_hum = min_hum
-        self._current_state = []
+        self.co2_pin = co2_pin
+        self.light_pin = light_pin
+        self.fan_pin = fan_pin
+        self._current_state = {}
+        self.initialize_pin(hum_sensor_pin)
+        pi = pigpio.pi()
+        self._dht22 = DHT22.sensor(pi, hum_sensor_pin)
+
+    def initialize_pin(self, pin):
+        GPIO.setmode(GPIO.BCM)
+        # GPIO.setup(PINS.RELAIS_1.value, GPIO.OUT)
+        # GPIO.setup(PINS.LED_1.value, GPIO.OUT)
+        GPIO.setup(pin, GPIO.IN)
 
     def update_measurements(self):
         """
         read sensors in chamber and return list
         """
-        current_time = datetime.now()
-        current_time_str = current_time.strftime("%d/%m/%Y %H:%M:%S")
-        rand = random.randint(0, 10)
-        self._current_state = [rand, 5, 6, current_time_str]
+        sensor_data = self.read_sensor_data()
+        time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        # print(time)
+        self._current_state = {
+            'time': time,
+            'humidity': sensor_data[Sensor.HUMIDITY],#sensor_data[Sensor.HUMIDITY],
+            'temperature': sensor_data[Sensor.TEMPERATURE],#sensor_data[Sensor.TEMPERATURE],
+            'co2': sensor_data[Sensor.CO2]['co2']
+        }
+        print(self._current_state)
         self.append_measurement()
 
     def upload_to_nextcloud(self):
@@ -45,4 +82,18 @@ class ShroomRoom():
             # Create a writer object from csv module
             csv_writer = writer(write_obj)
             # Add contents of list as last row in the csv file
-            csv_writer.writerow(self._current_state)
+            csv_writer.writerow([
+                self._current_state['time'],
+                self._current_state['co2'],
+                self._current_state['humidity'],
+                self._current_state['temperature']
+            ])
+
+    def read_sensor_data(self):
+        sensor_data = {}
+        sensor_data[Sensor.CO2] = mh_z19.read_all()
+        hum_temp_list = list(self._dht22.read())
+        sensor_data[Sensor.HUMIDITY] = hum_temp_list[4]
+        sensor_data[Sensor.TEMPERATURE] = hum_temp_list[3]
+        return sensor_data
+
