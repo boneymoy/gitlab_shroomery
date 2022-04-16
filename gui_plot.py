@@ -28,7 +28,7 @@ app.layout = html.Div(
         'backgroundColor': colors['background']
     },
     children=[
-        html.H1(children='Hello Ass',
+        html.H1(children='Shroomery',
                 style={
                     'textAlign': 'center',
                     'color': colors['text'],
@@ -66,7 +66,6 @@ def update_graph_live(n):
     df = pd.read_csv(SAVE_FILE_PATH)
     # fig.update_traces(overwrite=True)
     # fig = make_subplots(rows=4, cols=2)
-    print(df)
     fig = make_subplots(rows=2, cols=2)
     fig.add_trace(
         go.Scatter(name="CO2",
@@ -93,6 +92,7 @@ def update_graph_live(n):
                                 width=6)),
         row=2, col=1
     )
+    """
     fig.add_trace(
         go.Scatter(x=df['time'][:50],
                    y=df['time'][:50],
@@ -100,7 +100,6 @@ def update_graph_live(n):
                                 width=6)),
         row=2, col=2
     )
-    """
     fig.add_trace(
         go.Scatter(x=df['time'][:50],
                    y=df['co2'][:50],

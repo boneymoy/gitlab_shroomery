@@ -2,12 +2,14 @@ from enum import Enum, IntEnum
 from datetime import datetime
 from csv import writer
 import subprocess
+import time
 
 import RPi.GPIO as GPIO
 import Adafruit_DHT
 import mh_z19
 import pigpio
 import DHT22
+
 
 class Pins(IntEnum):
     RELAIS_1 = 4
@@ -45,6 +47,8 @@ class ShroomRoom():
         self.co2_pin = co2_pin
         self.light_pin = light_pin
         self.fan_pin = fan_pin
+        self._last_action = 0
+        self._adaptation_pause = 5 * 60 # 5 minuite
         self._current_state = {}
         self.initialize_pin(hum_sensor_pin)
         pi = pigpio.pi()
@@ -97,3 +101,25 @@ class ShroomRoom():
         sensor_data[Sensor.TEMPERATURE] = hum_temp_list[3]
         return sensor_data
 
+    def check_action(self):
+
+        last_action_delta = time.time() - self._last_action
+        if last_action_delta > self._adaptation_pause:
+            if self._current_state['co2'] > self.max_co2:
+                # start fan
+                pass
+            elif self._current_state['co2'] < self.min_co2:
+                # is this possible
+                pass
+            if self._current_state['temperature'] > self.max_temp:
+                # fan if temp outside is cooler
+                pass
+            elif self._current_state['temperature'] < self.min_temp:
+                # heat up
+                pass
+            if self._current_state['humidity'] > self.max_hum:
+                # start fan
+                pass
+            elif self._current_state['humidity'] < self.min_hum:
+                # start humidifier 
+                pass
