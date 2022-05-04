@@ -1,64 +1,40 @@
-from enum import Enum, IntEnum
 from datetime import datetime
 from csv import writer
+import multiprocessing
 import subprocess
 import time
 
 import RPi.GPIO as GPIO
-import Adafruit_DHT
 import mh_z19
 import pigpio
 import DHT22
 
 
-class Pins(IntEnum):
-    RELAIS_1 = 4
-    LED_1 = 26
-    SENSOR = 27
-
-class Sensor(Enum):
-    HUMIDITY = 'humidity'
-    TEMPERATURE = 'temperature'
-    CO2 = 'co2'
-
 class ShroomRoom():
 
     def __init__(self,
                  file_path: str,
-                 max_co2: int,
-                 min_co2: int,
-                 max_temp: int,
-                 min_temp: int,
-                 max_hum: int,
-                 min_hum: int,
-                 hum_sensor_pin: int,
-                 co2_pin: int,
-                 light_pin: int,
-                 fan_pin: int):
+                 limits: dict,
+                 pins: dict):
         """
         """
         self.file_path = file_path
-        self.max_co2 = max_co2
-        self.min_co2 = min_co2
-        self.max_temp = max_temp
-        self.min_temp = min_temp
-        self.max_hum = max_hum
-        self.min_hum = min_hum
-        self.co2_pin = co2_pin
-        self.light_pin = light_pin
-        self.fan_pin = fan_pin
-        self._last_action = 0
-        self._adaptation_pause = 5 * 60 # 5 minuite
+        self.limits = limits
+        self.pins = pins
+        self.fan_runtime = 10  # in s
+        self._last_action = time.time()
+        self._adaptation_pause = 1 * 60  # 1 minuite
         self._current_state = {}
-        self.initialize_pin(hum_sensor_pin)
-        pi = pigpio.pi()
-        self._dht22 = DHT22.sensor(pi, hum_sensor_pin)
+        self.initialize_pins()
+        # temp and humidity sensor
 
-    def initialize_pin(self, pin):
+    def initialize_pins(self):
         GPIO.setmode(GPIO.BCM)
-        # GPIO.setup(PINS.RELAIS_1.value, GPIO.OUT)
+        GPIO.setup(self.pins['fan'], GPIO.OUT)
         # GPIO.setup(PINS.LED_1.value, GPIO.OUT)
-        GPIO.setup(pin, GPIO.IN)
+        GPIO.setup(self.pins['hum'], GPIO.IN)
+        pi = pigpio.pi()
+        self._dht22 = DHT22.sensor(pi, self.pins['hum'])
 
     def update_measurements(self):
         """
@@ -69,9 +45,9 @@ class ShroomRoom():
         # print(time)
         self._current_state = {
             'time': time,
-            'humidity': sensor_data[Sensor.HUMIDITY],#sensor_data[Sensor.HUMIDITY],
-            'temperature': sensor_data[Sensor.TEMPERATURE],#sensor_data[Sensor.TEMPERATURE],
-            'co2': sensor_data[Sensor.CO2]['co2']
+            'hum': sensor_data['hum'],
+            'temp': sensor_data['temp'],
+            'co2': sensor_data['co2']
         }
         print(self._current_state)
         self.append_measurement()
@@ -89,37 +65,46 @@ class ShroomRoom():
             csv_writer.writerow([
                 self._current_state['time'],
                 self._current_state['co2'],
-                self._current_state['humidity'],
-                self._current_state['temperature']
+                self._current_state['hum'],
+                self._current_state['temp']
             ])
 
     def read_sensor_data(self):
         sensor_data = {}
-        sensor_data[Sensor.CO2] = mh_z19.read_all()
+        #TODO
+        sensor_data['co2'] = mh_z19.read_all()['co2']
         hum_temp_list = list(self._dht22.read())
-        sensor_data[Sensor.HUMIDITY] = hum_temp_list[4]
-        sensor_data[Sensor.TEMPERATURE] = hum_temp_list[3]
+        sensor_data['hum'] = hum_temp_list[4]
+        sensor_data['temp'] = hum_temp_list[3]
         return sensor_data
 
     def check_action(self):
-
+        """
+        check if every measurement lies in defined limits
+        !!! start function in parallel !!!
+        """
         last_action_delta = time.time() - self._last_action
+        print(last_action_delta)
         if last_action_delta > self._adaptation_pause:
-            if self._current_state['co2'] > self.max_co2:
-                # start fan
-                pass
-            elif self._current_state['co2'] < self.min_co2:
-                # is this possible
-                pass
-            if self._current_state['temperature'] > self.max_temp:
-                # fan if temp outside is cooler
-                pass
-            elif self._current_state['temperature'] < self.min_temp:
-                # heat up
-                pass
-            if self._current_state['humidity'] > self.max_hum:
-                # start fan
-                pass
-            elif self._current_state['humidity'] < self.min_hum:
-                # start humidifier 
-                pass
+            if self._current_state['co2'] > self.limits['co2']['max']:
+                fan_process = multiprocessing.Process(target=self.start_fan())
+                fan_process.start()
+                self._last_action = time.time()
+
+    def start_fan(self):
+        """
+        switch relais so fan is started
+        """
+        start_time = time.time()
+        # GPIO.output(self.pins['fan'], GPIO.HIGH)
+        current_time = time.time()
+        print('turned on')
+        while current_time - start_time < self.fan_runtime:
+            time.sleep(1)
+            current_time = time.time()
+            continue
+        print('turned off')
+        # GPIO.output(self.pins['fan'], GPIO.LOW)
+
+    def turn_off(self):
+        GPIO.output(self.pins['fan'], GPIO.LOW)
