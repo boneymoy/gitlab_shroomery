@@ -83,10 +83,12 @@ class ShroomRoom():
         check if every measurement lies in defined limits
         !!! start function in parallel !!!
         """
+        # TODO
         last_action_delta = time.time() - self._last_action
         print(last_action_delta)
         if last_action_delta > self._adaptation_pause:
             if self._current_state['co2'] > self.limits['co2']['max']:
+                # threading.Thread(self.start_fan())
                 fan_process = multiprocessing.Process(target=self.start_fan())
                 fan_process.start()
                 self._last_action = time.time()
