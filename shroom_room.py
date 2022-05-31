@@ -1,7 +1,7 @@
 from datetime import datetime
 from csv import writer
-import multiprocessing
 import subprocess
+import multiprocessing
 import time
 
 import RPi.GPIO as GPIO
@@ -10,31 +10,37 @@ import pigpio
 import DHT22
 
 
-class ShroomRoom():
+class ShroomRoom(multiprocessing.Process):
 
     def __init__(self,
+                 name: str,
                  file_path: str,
                  limits: dict,
                  pins: dict):
         """
         """
+        self.name = name
         self.file_path = file_path
         self.limits = limits
         self.pins = pins
         self.fan_runtime = 10  # in s
         self._last_action = time.time()
-        self._adaptation_pause = 1 * 60  # 1 minuite
+        self._adaptation_pause = 1 * 10 # in seconds
         self._current_state = {}
         self.initialize_pins()
         # temp and humidity sensor
 
     def initialize_pins(self):
         GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.pins['fan'], GPIO.OUT)
+        # print(self.pins['fan_in'])
+        GPIO.setup(self.pins['fan_in'], GPIO.OUT)
+        GPIO.setup(self.pins['heater'], GPIO.OUT)
+        GPIO.output(self.pins['fan_in'], GPIO.LOW)
+        GPIO.setup(self.pins['fan_out'], GPIO.OUT)
+        GPIO.output(self.pins['fan_out'], GPIO.LOW)
         # GPIO.setup(PINS.LED_1.value, GPIO.OUT)
         GPIO.setup(self.pins['hum'], GPIO.IN)
         pi = pigpio.pi()
-        self._dht22 = DHT22.sensor(pi, self.pins['hum'])
 
     def update_measurements(self):
         """
@@ -73,40 +79,79 @@ class ShroomRoom():
         sensor_data = {}
         #TODO
         sensor_data['co2'] = mh_z19.read_all()['co2']
-        hum_temp_list = list(self._dht22.read())
-        sensor_data['hum'] = hum_temp_list[4]
-        sensor_data['temp'] = hum_temp_list[3]
+        # hum_temp_list = list(self._dht22.read())
+        humidity, temperature = DHT22.read_DHT(self.pins['hum'])
+        sensor_data['hum'] = humidity
+        sensor_data['temp'] = temperature
         return sensor_data
 
     def check_action(self):
         """
         check if every measurement lies in defined limits
         !!! start function in parallel !!!
+
+        co2>limit -> ventilation
+        co2<limit -> nothing
+
+        hum<limit -> humidifier
+        hum>limit -> ventilation?
+
+        temp<limit-> heater
+        temp>limit-> ventilation
         """
-        # TODO
         last_action_delta = time.time() - self._last_action
-        print(last_action_delta)
         if last_action_delta > self._adaptation_pause:
+            print(self._current_state['co2'])
             if self._current_state['co2'] > self.limits['co2']['max']:
-                # threading.Thread(self.start_fan())
-                fan_process = multiprocessing.Process(target=self.start_fan())
-                fan_process.start()
+                # turn on ventilation 
+                print('start fan')
+                self.switch_relay(
+                    pins=[self.pins['fan_in'],
+                          self.pins['fan_out']],
+                    on_time=self.fan_runtime)
+                self._last_action = time.time()
+            if self._current_state['hum'] < self.limits['hum']['min']:
+                # turn on humidifier
+                self.switch_relay(
+                    pins=[self.pins['hum']],
+                    on_time=self.fan_runtime)
+                self._last_action = time.time()
+            if self._current_state['hum'] > self.limits['hum']['max']:
+                # turn on ventilation 
+                self.switch_relay(
+                    pins=[self.pins['hum']],
+                    on_time=self.fan_runtime)
+                self._last_action = time.time()
+            if self._current_state['temp'] < self.limits['temp']['min']:
+                # turn on heater 
+                self.switch_relay(
+                    pins=[self.pins['heat']],
+                    on_time=self.fan_runtime)
+                self._last_action = time.time()
+            if self._current_state['temp'] > self.limits['temp']['max']:
+                # turn on ventilation 
+                self.switch_relay(
+                    pins=[self.pins['heater']],
+                    on_time=self.fan_runtime)
                 self._last_action = time.time()
 
-    def start_fan(self):
+    def switch_relay(self, pins: list, on_time: int):
         """
-        switch relais so fan is started
+        turn on device at realy pins defined in list
+        keep device turned on for on_time seconds
         """
         start_time = time.time()
-        # GPIO.output(self.pins['fan'], GPIO.HIGH)
+        for pin in pins:
+            GPIO.output(pin, GPIO.HIGH)
         current_time = time.time()
-        print('turned on')
-        while current_time - start_time < self.fan_runtime:
-            time.sleep(1)
+        while current_time - start_time < on_time:
             current_time = time.time()
             continue
-        print('turned off')
-        # GPIO.output(self.pins['fan'], GPIO.LOW)
+        for pin in pins:
+            GPIO.output(pin, GPIO.LOW)
 
-    def turn_off(self):
-        GPIO.output(self.pins['fan'], GPIO.LOW)
+    def stop(self):
+        GPIO.output(self.pins['fan_in'], GPIO.LOW)
+        GPIO.output(self.pins['fan_out'], GPIO.LOW)
+        GPIO.output(self.pins['heater'], GPIO.LOW)
+        print(f'{self.name} turned off!')
