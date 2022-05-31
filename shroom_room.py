@@ -16,10 +16,12 @@ class Pins(IntEnum):
     LED_1 = 26
     SENSOR = 27
 
+
 class Sensor(Enum):
     HUMIDITY = 'humidity'
     TEMPERATURE = 'temperature'
     CO2 = 'co2'
+
 
 class ShroomRoom():
 
