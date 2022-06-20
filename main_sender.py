@@ -1,13 +1,13 @@
-import sys
-import time
 import traceback
 import threading
+import time
+import sys
 
 from shroom_room import ShroomRoom
 
-UPDATE_FREQ = 5
-UPLOAD_FREQ = 15
-ACTION_FREQ = 30
+UPDATE_FREQ = 10
+UPLOAD_FREQ = 30
+ACTION_FREQ = 60
 
 FILE_PATH_INC = 'incubation_chamber.csv'
 FILE_PATH_FRT = 'fruiting_chamber.csv'
@@ -15,13 +15,14 @@ FILE_PATH_FRT = 'fruiting_chamber.csv'
 
 def monitor_loop(shroom_room):
     last_update_time = time.time()
-    last_upload_time = time.time()
-    last_action_time = time.time()
+    last_upload_time = last_update_time
+    last_action_time = last_update_time
     while True:
         current_time = time.time()
         if current_time - last_update_time > UPDATE_FREQ:
             print("update")
             shroom_room.update_measurements()
+            print(shroom_room._current_state)
             last_update_time = time.time()
         if current_time - last_upload_time > UPLOAD_FREQ:
             shroom_room.upload_to_nextcloud()
@@ -32,28 +33,25 @@ def monitor_loop(shroom_room):
 
 if __name__ == "__main__":
     try:
-        # BaseManager.register('ShroomRoom', ShroomRoom)
-        # manager = BaseManager()
-        # manager.start()
         incubation_chamber = ShroomRoom(
             name = 'Incubation Chamber',
             file_path=FILE_PATH_INC,
             limits={
                 'co2': {
-                    'max': 600,
+                    'max': 1000,
                     'min': 0
                 },
                 'temp': {
-                    'max': 40,
+                    'max': 30,
                     'min': 0
                 },
                 'hum': {
-                    'max': 100,
+                    'max': 80,
                     'min': 0
                 }
             },
             pins={
-                'hum': 4,
+                'hum': 17,
                 'co2': 1,
                 'light': 1,
                 'fan_in': 19,
@@ -64,8 +62,6 @@ if __name__ == "__main__":
         rooms.append(incubation_chamber)
         for room in rooms:
             monitor_loop(room)
-        # Process(target=monitor_loop, args=[incubation_chamber]).start()
-        # Process(target=controller_loop, args=[incubation_chamber]).start()
 
     except (Exception, KeyboardInterrupt) as e:
         for room in rooms:
