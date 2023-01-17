@@ -38,6 +38,6 @@ while True:
     if current_time - last_control_time > CONTROL_FREQ:
         for room in rooms:
             room.check_action()
-    # print(incubation_chamber._current_state)
-    # fruiting_chamber.update_measurements()
-    # fruiting_chamber.upload_to_nextcloud()
+    print(incubation_chamber._current_state)
+    fruiting_chamber.update_measurements()
+    fruiting_chamber.upload_to_nextcloud()

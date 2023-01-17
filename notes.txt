@@ -3,3 +3,6 @@ MH_Z19:
 DHT22:
     sudo pigpiod - immer bei restart ausführen
     pigpio.pi installieren
+
+über ssh zugreifen mit:
+sshfs -o idmap=user pi@192.168.178.85:/home/pi/Shrooms/shroomery remote_shroomery/
