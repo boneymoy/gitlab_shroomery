@@ -8,6 +8,7 @@ from dash import Dash, html, dcc
 import pandas as pd
 
 import subprocess
+import os
 
 DOWNLOAD_INC_FILE_PATH = 'incubation_chamber.csv'
 SAVE_FILE_PATH = 'ass.csv'
@@ -59,18 +60,21 @@ app.layout = html.Div(
     Output('humidity-graph', 'figure'),
     Input('interval-component', 'n_intervals'))
 def update_graph_live(n):
-
     subprocess.call(["./download.sh", DOWNLOAD_INC_FILE_PATH, SAVE_FILE_PATH],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.STDOUT)
-    df = pd.read_csv(SAVE_FILE_PATH)
+    if os.path.isfile(SAVE_FILE_PATH):
+        sender_data = pd.read_csv(SAVE_FILE_PATH)
+    else:
+        print(f'No file at: {SAVE_FILE_PATH}')
+        return None
     # fig.update_traces(overwrite=True)
     # fig = make_subplots(rows=4, cols=2)
     fig = make_subplots(rows=2, cols=2)
     fig.add_trace(
         go.Scatter(name="CO2",
-                   x=df['time'],
-                   y=df['co2'],
+                   x=sender_data['time'],
+                   y=sender_data['co2'],
                    line=go.Line(color='#8ec07c',
                                 width=6),
                    ),
@@ -78,16 +82,16 @@ def update_graph_live(n):
     )
     fig.add_trace(
         go.Scatter(name="Humidity",
-                   x=df['time'],
-                   y=df['humidity'],
+                   x=sender_data['time'],
+                   y=sender_data['humidity'],
                    line=go.Line(color='#b16286',
                                 width=6)),
         row=1, col=2
     )
     fig.add_trace(
         go.Scatter(name="Temperature",
-                   x=df['time'],
-                   y=df['temperature'],
+                   x=sender_data['time'],
+                   y=sender_data['temperature'],
                    line=go.Line(color='#d79921',
                                 width=6)),
         row=2, col=1
@@ -147,4 +151,10 @@ def update_graph_live(n):
 
 
 if __name__ == '__main__':
+    try:
+        os.remove(SAVE_FILE_PATH)
+        print('Removed old csv file.')
+    except Exception:
+        print('Found no old csv file.')
+
     app.run_server(debug=True)
