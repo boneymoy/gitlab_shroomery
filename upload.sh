@@ -1,2 +1,2 @@
 #!/bin/bash
-curl -u Shroom:ichbin1pilz -T $1 https://friz-nc.uk/remote.php/dav/files/Shroom/
+curl -u $SHROOM_USER:$SHROOM_PASSWORD -T $1 https://friz-nc.uk/remote.php/dav/files/$SHROOM_USER/
